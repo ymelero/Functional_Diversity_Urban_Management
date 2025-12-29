@@ -58,10 +58,17 @@ sites_sf <- st_intersection(sites_sf, bcn_sf)
 # Plot maps
 # 13. Plot with ggplot2
 library(ggspatial)
+ndvi_df2 <- ndvi_df %>%
+  dplyr::mutate(NDVI = ifelse(NDVI <= 0.1, NA, NDVI))
 
 ggplot() +
-  geom_raster(data = ndvi_df, aes(x = x, y = y, fill = NDVI)) +
-  scale_fill_viridis_c(option = "C", na.value = "transparent") +
+  geom_raster(data = ndvi_df2, aes(x = x, y = y, fill = NDVI)) +
+  #scale_fill_viridis_c(option = "C", na.value = "transparent") +
+  scale_fill_gradient(
+    low = "white",
+    high = "#006d2c",
+    na.value = "transparent"
+  )+
   geom_sf(data = bcn_sf, fill = NA, color = "black", size = 0.3) +
   geom_sf(data = sites_sf, color = "grey20", size = 3, shape = 21, fill = "yellow2") +
   annotation_scale(location = "bl", width_hint = 0.25,
@@ -77,7 +84,7 @@ ggplot() +
   
   # --- estética general ---
   theme_minimal() +
-  labs(fill = "NDVI") +
+  labs(fill = "NDVI")+
   theme(
     axis.title = element_blank(),
     axis.text  = element_blank(),
