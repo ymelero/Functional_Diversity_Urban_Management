@@ -4,7 +4,7 @@
 
 library(DiagrammeR)
 
-## SEM_B with area and garden type with co-variance: 
+## SEM_B with area and management intensity with co-variance: 
 g <- grViz("
 digraph SEM_B {
   graph [layout = dot, rankdir = TB]
@@ -16,7 +16,7 @@ digraph SEM_B {
   # Nodes
   Area [label = 'Area total', shape = box]
   Conn [label = 'Connectivity (C500)', shape = box]
-  Tipo [label = 'Garden type', shape = box]
+  Tipo [label = 'M. Intensity', shape = box]
 
   V1 [label = 'C3-grass', shape = ellipse]
   V2 [label = 'P-grass',  shape = ellipse]
@@ -36,7 +36,7 @@ digraph SEM_B {
   Area -> V3
   Area -> V4
 
-  Tipo -> V1
+  #Tipo -> V1
   Tipo -> V2
   Tipo -> V3
   Tipo -> V4
@@ -52,11 +52,11 @@ digraph SEM_B {
   Area -> Resp
   Conn -> Resp
 
-  # Covariance between Area and Type
+  # Covariance between Area and M.I
   Area -> Tipo [dir=both, arrowhead=none, arrowtail=none, style=dashed, color=grey70]
 }
 ")
-
+g
 library(DiagrammeRsvg)
 library(rsvg)
 svg_code <- export_svg(g)

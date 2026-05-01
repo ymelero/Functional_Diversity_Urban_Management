@@ -13,7 +13,7 @@ library(brms)
 detach("package:ggeffects")
 detach("package:gridExtra")
 
-fit_c2 <- readRDS("Results/Abundance_brms_SEM_Cluster2.rds") #load the corresponding one
+fit_c2 <- readRDS("Results/Abundance_brms_SEM_Cluster2.rds") #load the corresponding file
 fx_all <- as.data.frame(fixef(fit_c2)) %>% mutate(across(everything(), as.numeric))
 
 # 1. Site variables
@@ -112,19 +112,19 @@ library(gridExtra)
 
 # Function for main responses (Beta)
 get_preds <- function(mediator) {
-  ce <- conditional_effects(fit_c2, effects = "Type", resp = mediator)
+  ce <- conditional_effects(fit_c2, effects = "Intensity", resp = mediator)
   
   as.data.frame(ce[[1]]) %>%
-    rename(predicted = estimate__, conf.low = lower__, conf.high = upper__, x = Type) %>%
+    rename(predicted = estimate__, conf.low = lower__, conf.high = upper__, x = Intensity) %>%
     mutate(Mediator = mediator)
 }
 
 # Function for hurdle component (distributional parameter 'hu')
 get_preds_hurdle <- function() {
-  ce <- conditional_effects(fit_c2, effects = "Type", resp = "abundance", dpar = "hu")
+  ce <- conditional_effects(fit_c2, effects = "Intensity", resp = "abundance", dpar = "hu")
   
   as.data.frame(ce[[1]]) %>%
-    rename(predicted = estimate__, conf.low = lower__, conf.high = upper__, x = Type) %>%
+    rename(predicted = estimate__, conf.low = lower__, conf.high = upper__, x = Intensity) %>%
     mutate(Mediator = "hu_abundance")
 }
 
@@ -143,8 +143,8 @@ preds_all <- bind_rows(preds_main, preds_hu)
 # Format for plotting
 preds_all <- preds_all %>%
   mutate(
-    Type = factor(x, levels = c("BIO", "PATRIMONIAL", "USOS"),
-                  labels = c("Bio.", "Hist.", "Soc.")),
+    Intensity = factor(x, levels = c("High", "Low", "Medium"),
+                  labels = c("High", "Low", "Medium")),
     Mediator = factor(Mediator,
                       levels = c("C3beta", "Pbeta", "Herbbeta", "Vivbeta",
                                  "abundance", "hu_abundance"),
@@ -155,22 +155,21 @@ preds_all <- preds_all %>%
 
 # Plot per variable
 preds_props <- preds_all %>%
-  filter(Mediator %in% c("C3", "P", "Herb", "Viv"))
+  filter(Mediator %in% c("P", "Herb", "Viv"))
 
-p1 <- ggplot(preds_props, aes(x = Type, y = predicted, color = Mediator)) +
+p.med.intensity <- ggplot(preds_props, aes(x = Intensity, y = predicted, color = Mediator)) +
   geom_point(position = position_dodge(width = 0.8), size = 1.5) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
                 position = position_dodge(width = 0.8), width = 0.25) +
-  labs(x = "Space Type", y = "Vegetation") +
+  labs(x = "Management Intensity", y = "Vegetation") +
   scale_color_brewer(palette = "Set2") +
   theme_classic(base_size = 12) +
   theme(
     legend.title = element_blank(),
-    legend.position = "none",
+    legend.position = "right",
     axis.text.x = element_text(size = 11),
     axis.title = element_text(size = 12)
   )
-p1
 
 # predict and plot area effect on vegetation:
 get_preds_area <- function(mediator) {
@@ -203,17 +202,18 @@ p_area <- ggplot(preds_area, aes(x = x, y = predicted, color = Mediator)) +
     axis.title = element_text(size = 12)
   )
 
-p_area
+
 
 # Plot PRESENCE and ABUNDANCE in relation to direct and indirect effects
-# Direct effect of Space type on P  and N:
+# Direct effect of Management Intensity on P  and N:
 preds_hu_plot <- preds_all %>%
   filter(Mediator == "Hurdle (P0)")
 
-p.hu.type <- ggplot(preds_hu_plot, aes(x = Type, y = 1-predicted, color = Type)) +
+p.hu.type <- ggplot(preds_hu_plot, aes(x = Intensity, y = 1-predicted, color = Intensity)) +
   geom_point(size = 2.5) +
   geom_errorbar(aes(ymin = 1- conf.low, ymax = 1-conf.high), width = 0.25) +
-  labs(x = "Space Type", y = "Presence") +
+  labs(x = "Management Intensity", y = "Presence") +
+  scale_x_discrete(limits = c( "High","Medium", "Low")) +
   scale_color_brewer(palette = "Set2") +
   theme_classic(base_size = 12) +
   theme(legend.title = element_blank(),
@@ -226,11 +226,12 @@ p.hu.type
 preds_abund <- preds_all %>%
   filter(Mediator == "Abundance")
 
-p.N.type <- ggplot(preds_abund, aes(x = Type, y = predicted, color = Type)) +
+p.N.type <- ggplot(preds_abund, aes(x = Intensity, y = predicted, color = Intensity)) +
   geom_point(size = 2.5) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.25) +
-  labs(x = "Space Type", y = "Abundance") +
+  labs(x = "Management Intensity", y = "Abundance") +
   scale_color_brewer(palette = "Set2") +
+  scale_x_discrete(limits = c( "High","Medium", "Low")) +
   theme_classic(base_size = 12) +
   theme(legend.title = element_blank(),
         legend.position = "top",
@@ -262,6 +263,10 @@ valid_SITE <- if ("SITE_ID" %in% names(fit_c2$data)) {
   names(sort(table(fit_c2$data$SITE_ID), decreasing = TRUE))[1]
 } else NULL
 
+valid_SPECIES <- if ("SPECIES" %in% names(fit_c2$data)) {
+  names(sort(table(fit_c2$data$SPECIES), decreasing = TRUE))[1]
+} else NULL
+
 
 predict_manual <- function(effect, seqx) {
   
@@ -275,9 +280,9 @@ predict_manual <- function(effect, seqx) {
     }
   }
   
-  # fix factor Type
-  if ("Type" %in% names(fit_c2$data)) {
-    nd$Type <- factor("BIO", levels = levels(fit_c2$data$Type))
+  # fix factor Intensity
+  if ("Intensity" %in% names(fit_c2$data)) {
+    nd$Intensity <- factor("High", levels = levels(fit_c2$data$Intensity))
   }
   
   # random effects
@@ -287,6 +292,10 @@ predict_manual <- function(effect, seqx) {
   
   if (!is.null(valid_SITE)) {
     nd$SITE_ID <- factor(valid_SITE, levels = levels(fit_c2$data$SITE_ID))
+  }
+  
+  if (!is.null(valid_SPECIES)) {
+    nd$SPECIES <- factor(valid_SPECIES, levels = levels(fit_c2$data$SPECIES))
   }
   
   # abundance prediction
@@ -343,6 +352,7 @@ pres.conn <- ggplot() +
               aes(x = x, ymin = pres_low, ymax = pres_high),
               fill = "#e0f3db", alpha = 0.15) +
   labs(x = "Connectivity", y = "Presence") +
+  #ylim(0, 0.15) +
   theme_classic(base_size = 12) +
   theme(legend.position = "none",
         axis.text.x = element_text(size = 11),
@@ -367,7 +377,7 @@ abdn.conn <- ggplot() +
               aes(x = x, ymin = abund_low, ymax = abund_high),
               fill = "#e0f3db", alpha = 0.15) +
   labs(x = "Connectivity", y = "Abundance") +
-  ylim(0, 50) +
+  ylim(0, 25) +
   theme_classic(base_size = 12) +
   theme(legend.position = "none",
         axis.text.x = element_text(size = 11),
@@ -462,7 +472,7 @@ abdn.C3 <- ggplot() +
               aes(x = x, ymin = abund_low, ymax = abund_high),
               fill = "peachpuff", alpha = 0.25) +
   labs(x = "C3-grass", y = "Abundance") +
-  ylim(0, 50) +
+  ylim(0, 25) +
   theme_classic(base_size = 12) +
   theme(legend.position = "none",
         axis.text.x = element_text(size = 11),
@@ -501,15 +511,15 @@ abdn.P <- ggplot() +
               aes(x = zP_logit, y = abundance),
               size = 2, alpha = 0.35,
               width = 0.05, height = 0.05,
-              color = "#FF8CC6") +
+              color = "#A1D99B") +
   geom_line(data = pred_P,
             aes(x = x, y = predicted_abund),
-            linewidth = 1.2, color = "#FF8CC6") +
+            linewidth = 1.2, color = "#A1D99B") +
   geom_ribbon(data = pred_P,
               aes(x = x, ymin = abund_low, ymax = abund_high),
-              fill = "#FFD6EA", alpha = 0.35) +
+              fill = "#e0f3db", alpha = 0.35) +
   labs(x = "P-grass", y = "Abundance") +
-  ylim(0, 100) +
+  ylim(0, 10) +
   theme_classic(base_size = 12) +
   theme(legend.position = "none",
         axis.text.x = element_text(size = 11),
@@ -548,16 +558,16 @@ abdn.Herb <- ggplot() +
               aes(x = zHerb_logit, y = abundance),
               size = 2, alpha = 0.7,
               width = 0.05, height = 0.15,
-              color = "orange",
+              color = "#A1D99B",
               shape = 23) +
   geom_line(data = pred_Herb,
             aes(x = x, y = predicted_abund),
-            linewidth = 1.2, color = "peachpuff") +
+            linewidth = 1.2, color = "#A1D99B") +
   geom_ribbon(data = pred_Herb,
               aes(x = x, ymin = abund_low, ymax = abund_high),
-              fill = "peachpuff", alpha = 0.25) +
+              fill = "#e0f3db", alpha = 0.25) +
   labs(x = "Herb-grass", y = "Abundance") +
-  ylim(0, 50) +
+  ylim(0, 25) +
   theme_classic(base_size = 12) +
   theme(legend.position = "none",
         axis.text.x = element_text(size = 11),
@@ -572,14 +582,14 @@ pres.Viv <- ggplot() +
   geom_jitter(data = fit_c2$data,
               aes(x = zViv_logit, y = ifelse(abundance > 0, 1, 0)),
               size = 2, alpha = 0.3,
-              color = "#A1D99B",
+              color = "orange",
               height = 0.05, width = 0.09) +
   geom_line(data = pred_Viv,
             aes(x = x, y = predicted_pres),
-            linewidth = 1.2, color = "#A1D99B") +
+            linewidth = 1.2, color = "peachpuff") +
   geom_ribbon(data = pred_Viv,
               aes(x = x, ymin = pres_low, ymax = pres_high),
-              fill = "#e0f3db", alpha = 0.15) +
+              fill = "peachpuff", alpha = 0.15) +
   labs(x = "Viv-grass", y = "Presence") +
   theme_classic(base_size = 12) +
   theme(legend.position = "none",
@@ -616,8 +626,6 @@ abdn.Viv <- ggplot() +
 #p.N.type
 #pres.conn
 #abdn.conn
-#pres.conn
-#abdn.conn
 #pres.area
 #abdn.area
 #pres.C3
@@ -630,6 +638,7 @@ abdn.Viv <- ggplot() +
 #abdn.Viv
 
 library(patchwork)
+library(grid)
 add_tag <- function(plot, tag) {
   plot +
     annotation_custom(
@@ -641,16 +650,23 @@ add_tag <- function(plot, tag) {
     )
 }
 
+# Mediators
+p_meds <- (add_tag(p_area, "(a)") |
+            add_tag(p.med.intensity, "(b)") )+
+  plot_layout(guides = "collect") &
+  theme(
+    legend.position = "right",
+    axis.text  = element_text(size = 14),
+    axis.title = element_text(size = 14)
+  )
+p_meds
+
+
 
 # FG2
-p_fg2 <-
-  (
-    add_tag(pres.conn, "(a)") |
-      add_tag(p.hu.type, "(b)")
-  ) /
-  (
-    add_tag(pres.C3, "(c)")   |
-      add_tag(pres.P, "(d)")
+p_fg2 <- (add_tag(pres.conn, "(a)") /
+      add_tag(p.hu.type, "(b)") /
+    add_tag(abdn.P, "(c)")   
   ) +
   plot_layout(guides = "collect") &
   theme(
@@ -660,8 +676,6 @@ p_fg2 <-
   )
 
 # no legends    
-p_fg2 <- p_fg2 + plot_layout(guides = "collect") &
-  theme(legend.position = "none")
 p_fg2
 
 # FG3
@@ -690,8 +704,8 @@ p_fg3 <- p_fg3 + plot_layout(guides = "collect") &
 # FG4
 p_fg4 <- (
   add_tag(pres.area , "(a)") |
-    add_tag(pres.C3 , "(b)") |
-    add_tag(abdn.Herb, "(c)")) +
+    add_tag(pres.Viv , "(b)") |
+    add_tag(pres.Herb, "(c)")) +
   plot_layout(guides = "collect") &
   theme(
     legend.position = "none",
